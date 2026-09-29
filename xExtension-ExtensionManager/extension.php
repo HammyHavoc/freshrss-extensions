@@ -1016,6 +1016,13 @@ class ExtensionManagerExtension extends Minz_Extension {
     }
 
     private static function downloadZip($zipUrl) {
+        // FreshRSS unregisters unsafe stream wrappers during bootstrap.
+        // Restore HTTPS temporarily so file_get_contents() can fetch GitHub archives.
+        $httpsWasRegistered = in_array('https', stream_get_wrappers(), true);
+        if (!$httpsWasRegistered) {
+            @stream_wrapper_restore('https');
+        }
+
         $context = stream_context_create([
             'http' => [
                 'timeout' => 30,
@@ -1024,7 +1031,14 @@ class ExtensionManagerExtension extends Minz_Extension {
                 'max_redirects' => 5,
             ],
         ]);
-        return @file_get_contents($zipUrl, false, $context);
+
+        $result = @file_get_contents($zipUrl, false, $context);
+
+        if (!$httpsWasRegistered && in_array('https', stream_get_wrappers(), true)) {
+            @stream_wrapper_unregister('https');
+        }
+
+        return $result;
     }
 
     private static function findExtensionDirs($dir, &$results, $depth) {
