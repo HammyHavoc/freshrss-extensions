@@ -1016,8 +1016,8 @@ class ExtensionManagerExtension extends Minz_Extension {
     }
 
     private static function downloadZip($zipUrl) {
-        // FreshRSS unregisters unsafe stream wrappers during bootstrap.
-        // Restore HTTPS temporarily so file_get_contents() can fetch GitHub archives.
+        // FreshRSS unregisters the HTTPS stream wrapper during bootstrap.
+        // Restore it temporarily for GitHub archive downloads.
         $httpsWasRegistered = in_array('https', stream_get_wrappers(), true);
         if (!$httpsWasRegistered) {
             @stream_wrapper_restore('https');
