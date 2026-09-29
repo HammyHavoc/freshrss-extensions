@@ -1016,29 +1016,26 @@ class ExtensionManagerExtension extends Minz_Extension {
     }
 
     private static function downloadZip($zipUrl) {
-        // FreshRSS unregisters the HTTPS stream wrapper during bootstrap.
-        // Restore it temporarily for GitHub archive downloads.
-        $httpsWasRegistered = in_array('https', stream_get_wrappers(), true);
-        if (!$httpsWasRegistered) {
-            @stream_wrapper_restore('https');
+        $ch = curl_init($zipUrl);
+        if ($ch === false) {
+            return false;
         }
 
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 30,
-                'user_agent' => 'FreshRSS-ExtensionManager/1.0',
-                'follow_location' => true,
-                'max_redirects' => 5,
-            ],
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_USERAGENT => 'FreshRSS-ExtensionManager/1.0',
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
         ]);
 
-        $result = @file_get_contents($zipUrl, false, $context);
+        $data = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
 
-        if (!$httpsWasRegistered && in_array('https', stream_get_wrappers(), true)) {
-            @stream_wrapper_unregister('https');
-        }
-
-        return $result;
+        return ($data !== false && $status === 200) ? $data : false;
     }
 
     private static function findExtensionDirs($dir, &$results, $depth) {
