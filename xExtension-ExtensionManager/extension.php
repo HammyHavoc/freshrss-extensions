@@ -1016,24 +1016,41 @@ class ExtensionManagerExtension extends Minz_Extension {
     }
 
     private static function downloadZip($zipUrl) {
+        // cURL, not file_get_contents(): FreshRSS 1.30 unregisters the network
+        // stream wrappers at startup as a security fix (FreshRSS/FreshRSS#9215).
+        // cURL does not use them, and FreshRSS already requires it.
         $ch = curl_init($zipUrl);
         if ($ch === false) {
             return false;
         }
 
-        curl_setopt_array($ch, [
+        $options = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_TIMEOUT => 30,
             CURLOPT_USERAGENT => 'FreshRSS-ExtensionManager/1.0',
-            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
-        ]);
+        ];
+        // HTTPS only, redirects included. The *_STR options need PHP 8.3 and
+        // libcurl 7.85; FreshRSS supports PHP 8.1, so fall back to the older
+        // options the way its own httpUtil.php does. Each is checked on its
+        // own, so redirects are never left unrestricted.
+        if (defined('CURLOPT_PROTOCOLS_STR') && is_int(CURLOPT_PROTOCOLS_STR)) {
+            $options[CURLOPT_PROTOCOLS_STR] = 'https';
+        } else {
+            $options[CURLOPT_PROTOCOLS] = CURLPROTO_HTTPS;
+        }
+        if (defined('CURLOPT_REDIR_PROTOCOLS_STR') && is_int(CURLOPT_REDIR_PROTOCOLS_STR)) {
+            $options[CURLOPT_REDIR_PROTOCOLS_STR] = 'https';
+        } else {
+            $options[CURLOPT_REDIR_PROTOCOLS] = CURLPROTO_HTTPS;
+        }
+        curl_setopt_array($ch, $options);
 
+        // No curl_close(): it has done nothing since PHP 8.0 and is deprecated
+        // in 8.5. The handle is freed when it goes out of scope.
         $data = curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
 
         return ($data !== false && $status === 200) ? $data : false;
     }
